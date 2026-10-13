@@ -1,0 +1,6 @@
+pillow
+pillow-heif
+ImageHash
+numpy
+scikit-learn
+pyinstaller
