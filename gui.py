@@ -7,7 +7,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
-from PhotoDuplicateFinder.photo_dedup import process_photos
+from photo_dedup import process_photos
 
 
 class PhotoDuplicateGUI:
