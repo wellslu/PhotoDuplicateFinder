@@ -1,35 +1,100 @@
-name: Build Windows EXE
+
+name: Build Windows Application
 
 on:
   workflow_dispatch:
+
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  build:
+  build-windows:
+    name: Build Windows EXE
     runs-on: windows-latest
 
+    permissions:
+      contents: read
+
     steps:
+      # 1. Download repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      # 2. Setup Python
+      - name: Setup Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           architecture: "x64"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
 
+      # 3. Install dependencies
       - name: Install dependencies
+        shell: pwsh
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
 
-      - name: Build Windows EXE
+      # 4. Verify project files
+      - name: Verify project files
+        shell: pwsh
         run: |
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name PhotoDuplicateFinder --collect-all pillow_heif --icon cat_square_icon.ico gui.py
+          $files = @(
+            "gui.py",
+            "photo_dedup.py",
+            "cat_square_icon.ico"
+          )
 
-      - name: Upload EXE
+          foreach ($file in $files) {
+            if (!(Test-Path $file)) {
+              throw "Missing required file: $file"
+            }
+          }
+
+      # 5. Build Windows application
+      - name: Build with PyInstaller
+        shell: pwsh
+        run: |
+          python -m PyInstaller `
+            --noconfirm `
+            --clean `
+            --onedir `
+            --windowed `
+            --name PhotoDuplicateFinder `
+            --collect-all pillow_heif `
+            --icon cat_square_icon.ico `
+            gui.py
+
+      # 6. Verify build
+      - name: Verify EXE
+        shell: pwsh
+        run: |
+          $exe = "dist/PhotoDuplicateFinder/PhotoDuplicateFinder.exe"
+
+          if (!(Test-Path $exe)) {
+            throw "EXE build failed!"
+          }
+
+          Write-Host "Build successful!"
+          Get-Item $exe | Select-Object Name, Length
+
+      # 7. Calculate SHA-256
+      - name: Calculate SHA-256
+        shell: pwsh
+        run: |
+          $exe = "dist/PhotoDuplicateFinder/PhotoDuplicateFinder.exe"
+
+          Get-FileHash $exe -Algorithm SHA256 |
+            Format-List |
+            Out-File -FilePath "dist/PhotoDuplicateFinder/SHA256.txt"
+
+      # 8. Upload packaged application
+      - name: Upload Windows Application
         uses: actions/upload-artifact@v4
         with:
           name: PhotoDuplicateFinder-Windows
-          path: dist/PhotoDuplicateFinder.exe
+          path: dist/PhotoDuplicateFinder/
+          if-no-files-found: error
+          retention-days: 30
